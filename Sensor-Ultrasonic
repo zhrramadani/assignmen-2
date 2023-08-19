@@ -1,0 +1,53 @@
+import RPi.GPIO as GPIO
+import time
+import requests
+
+# Set up GPIO mode and pins
+GPIO.setmode(GPIO.BCM)
+TRIG_PIN = 4
+ECHO_PIN = 22
+
+# Ubidots token
+UBIDOTS_TOKEN = "BBFF-FVadVsFGjZLV6VRjyTdGtD6ANKzDD6"
+
+# Initialize GPIO pins
+GPIO.setup(TRIG_PIN, GPIO.OUT)
+GPIO.setup(ECHO_PIN, GPIO.IN)
+
+def send_to_ubidots(distance_cm):
+    payload = {'distance_cm': distance_cm}
+    try:
+        r = requests.post(f'http://industrial.api.ubidots.com/api/v1.6/devices/raspberry_ultrasonic/?token={UBIDOTS_TOKEN}', data=payload)
+        print('Posting distance data to Ubidots')
+        print(payload)
+    except Exception as e:
+        print(f'Error: {e}')
+
+def measure_distance():
+    GPIO.output(TRIG_PIN, GPIO.HIGH)
+    time.sleep(0.00001)
+    GPIO.output(TRIG_PIN, GPIO.LOW)
+
+    pulse_start = time.time()
+    pulse_end = time.time()
+
+    while GPIO.input(ECHO_PIN) == 0:
+        pulse_start = time.time()
+
+    while GPIO.input(ECHO_PIN) == 1:
+        pulse_end = time.time()
+
+    pulse_duration = pulse_end - pulse_start
+    speed_of_sound = 34300  # Speed of sound in cm/s
+    distance_cm = (pulse_duration * speed_of_sound) / 2
+
+    return distance_cm
+
+try:
+    while True:
+        distance = measure_distance()
+        send_to_ubidots(distance)
+        time.sleep(1)  # Wait between distance measurements
+
+except KeyboardInterrupt:
+    GPIO.cleanup()
